@@ -119,11 +119,101 @@ pub fn workspace_is_ordered_before(ws: Workspace, earlier_name: String, later_na
     return false;
 }
 
+pub fn string_contains(haystack: String, needle: String) -> bool {
+    let h_len = string_len(haystack);
+    let n_len = string_len(needle);
+    if h_len < n_len { return false; }
+    if n_len == 0 { return true; }
+    mut i: i64 = 0;
+    while i <= h_len - n_len {
+        if string_substr(haystack, i, n_len) == needle {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+pub fn workspace_get_member_name_at(ws: Workspace, target_idx: i64) -> String {
+    if target_idx < 0 || target_idx >= ws.member_count {
+        return "";
+    }
+    let total_len = string_len(ws.members_data);
+    mut current_idx: i64 = 0;
+    mut i: i64 = 0;
+    while i < total_len {
+        let c = string_char_at(ws.members_data, i);
+        if c == 91 { // '['
+            if current_idx == target_idx {
+                let pipe = find_char(ws.members_data, i + 1, 124); // '|'
+                if pipe > i + 1 {
+                    return string_substr(ws.members_data, i + 1, pipe - (i + 1));
+                }
+                return "";
+            }
+            current_idx = current_idx + 1;
+        }
+        i = i + 1;
+    }
+    return "";
+}
+
+pub fn workspace_deps_resolved(deps: String, resolved_names: String) -> bool {
+    let d_len = string_len(deps);
+    if d_len == 0 { return true; }
+    mut start: i64 = 0;
+    mut i: i64 = 0;
+    while i < d_len {
+        if string_char_at(deps, i) == 44 { // ','
+            if i > start {
+                let dep_name = string_substr(deps, start, i - start);
+                let pattern = "," + dep_name + ",";
+                if !string_contains(resolved_names, pattern) {
+                    return false;
+                }
+            }
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    return true;
+}
+
 pub fn workspace_build_plan(ws: Workspace) -> String {
     if ws.member_count == 0 {
         return "";
     }
-    return "shared_models->core_engine->api_gateway->";
+
+    mut plan = "";
+    mut resolved_names = ",";
+    mut resolved_count: i64 = 0;
+
+    mut round: i64 = 0;
+    while round < ws.member_count {
+        mut advanced = false;
+        mut m_idx: i64 = 0;
+        while m_idx < ws.member_count {
+            let name = workspace_get_member_name_at(ws, m_idx);
+            let token = "," + name + ",";
+            if !string_contains(resolved_names, token) {
+                let deps = workspace_get_member_deps(ws, name);
+                if workspace_deps_resolved(deps, resolved_names) {
+                    resolved_names = resolved_names + name + ",";
+                    plan = plan + name + "->";
+                    resolved_count = resolved_count + 1;
+                    advanced = true;
+                }
+            }
+            m_idx = m_idx + 1;
+        }
+
+        if !advanced {
+            break;
+        }
+        round = round + 1;
+    }
+
+    return plan;
 }
 
 pub fn test_kori_workspace_graph() -> bool {
@@ -160,8 +250,27 @@ pub fn test_kori_workspace_graph() -> bool {
 
     // Topological build ordering
     let plan = workspace_build_plan(ws);
-    // Expected: shared_models first (no deps), then core_engine and api_gateway
     if plan != "shared_models->core_engine->api_gateway->" {
+        return false;
+    }
+
+    // Test reverse registration order yields identical deterministic topological order
+    mut ws_rev = make_workspace("/root/mono");
+    workspace_add_member(inout ws_rev, "api_gateway", "services/gateway", "0.1.0", "core_engine,shared_models,");
+    workspace_add_member(inout ws_rev, "core_engine", "core", "0.1.0", "shared_models,");
+    workspace_add_member(inout ws_rev, "shared_models", "shared/models", "0.1.0", "");
+
+    let plan_rev = workspace_build_plan(ws_rev);
+    if plan_rev != "shared_models->core_engine->api_gateway->" {
+        return false;
+    }
+
+    // Test cycle detection: mutual circular dependency cannot be resolved
+    mut ws_cycle = make_workspace("/root/mono");
+    workspace_add_member(inout ws_cycle, "pkg_a", "pkg_a", "0.1.0", "pkg_b,");
+    workspace_add_member(inout ws_cycle, "pkg_b", "pkg_b", "0.1.0", "pkg_a,");
+    let plan_cycle = workspace_build_plan(ws_cycle);
+    if plan_cycle != "" {
         return false;
     }
 
