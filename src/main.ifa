@@ -8,7 +8,7 @@ import crypto;
 import workspace;
 
 pub fn main() {
-    println("kori: autonomous package manager for ifa (v0.2.0)");
+    println("kori: autonomous package manager for ifa (v0.1.0)");
 
     let t_manifest = manifest::test_kori_manifest_structure();
     if t_manifest {

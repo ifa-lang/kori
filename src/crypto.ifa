@@ -100,8 +100,8 @@ pub fn test_kori_crypto_signatures() -> bool {
         return false;
     }
 
-    mut sig = make_package_signature("kori", "0.2.0", valid_hash, pubkey, sig_64);
-    if sig.package_name != "kori" || sig.version != "0.2.0" {
+    mut sig = make_package_signature("kori", "0.1.0", valid_hash, pubkey, sig_64);
+    if sig.package_name != "kori" || sig.version != "0.1.0" {
         return false;
     }
 

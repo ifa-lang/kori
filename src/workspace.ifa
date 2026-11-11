@@ -128,9 +128,9 @@ pub fn workspace_build_plan(ws: Workspace) -> String {
 
 pub fn test_kori_workspace_graph() -> bool {
     mut ws = make_workspace("/root/mono");
-    workspace_add_member(inout ws, "shared_models", "shared/models", "0.2.0", "");
-    workspace_add_member(inout ws, "core_engine", "core", "0.2.0", "shared_models,");
-    workspace_add_member(inout ws, "api_gateway", "services/gateway", "0.2.0", "core_engine,shared_models,");
+    workspace_add_member(inout ws, "shared_models", "shared/models", "0.1.0", "");
+    workspace_add_member(inout ws, "core_engine", "core", "0.1.0", "shared_models,");
+    workspace_add_member(inout ws, "api_gateway", "services/gateway", "0.1.0", "core_engine,shared_models,");
 
     if ws.member_count != 3 {
         return false;
@@ -145,7 +145,7 @@ pub fn test_kori_workspace_graph() -> bool {
     if p_shared != "shared/models" { return false; }
 
     let v_core = workspace_get_member_version(ws, "core_engine");
-    if v_core != "0.2.0" { return false; }
+    if v_core != "0.1.0" { return false; }
 
     let d_gw = workspace_get_member_deps(ws, "api_gateway");
     if d_gw != "core_engine,shared_models," { return false; }
