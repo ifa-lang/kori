@@ -1,0 +1,44 @@
+// Pure IFA: Kori Autonomous CLI Entrypoint (`src/main.ifa`)
+
+import manifest;
+import resolver;
+import cache;
+import builder;
+
+pub fn main() {
+    println("kori: autonomous package manager for ifa (v0.1.0)");
+
+    let t_manifest = manifest::test_kori_manifest_structure();
+    if t_manifest {
+        println("manifest: ok");
+    } else {
+        println("manifest: failed");
+    }
+
+    let t_resolver = resolver::test_kori_semver_resolver();
+    if t_resolver {
+        println("resolver: ok");
+    } else {
+        println("resolver: failed");
+    }
+
+    let t_cache = cache::test_kori_cache_subsystem();
+    if t_cache {
+        println("cache: ok");
+    } else {
+        println("cache: failed");
+    }
+
+    let t_builder = builder::test_kori_builder_orchestrator();
+    if t_builder {
+        println("builder: ok");
+    } else {
+        println("builder: failed");
+    }
+
+    if t_manifest && t_resolver && t_cache && t_builder {
+        println("kori: ALL SUBSYSTEM TESTS PASSED");
+    } else {
+        println("kori: TESTS FAILED");
+    }
+}

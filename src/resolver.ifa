@@ -1,0 +1,154 @@
+// Pure IFA: Kori SemVer & Dependency Resolution (`src/resolver.ifa`)
+// Deterministic Semantic Versioning 2.0.0 parser and resolution engine.
+
+pub struct SemVer {
+    major: i64,
+    minor: i64,
+    patch: i64
+}
+
+pub fn make_semver(major: i64, minor: i64, patch: i64) -> SemVer {
+    return SemVer(
+        major: major,
+        minor: minor,
+        patch: patch
+    );
+}
+
+pub fn int_to_str(mut n: i64) -> String {
+    if n == 0 { return "0"; }
+    mut is_neg = false;
+    if n < 0 {
+        is_neg = true;
+        n = 0 - n;
+    }
+    mut digits = "";
+    while n > 0 {
+        let rem = n % 10;
+        if rem == 0 { digits = "0" + digits; }
+        if rem == 1 { digits = "1" + digits; }
+        if rem == 2 { digits = "2" + digits; }
+        if rem == 3 { digits = "3" + digits; }
+        if rem == 4 { digits = "4" + digits; }
+        if rem == 5 { digits = "5" + digits; }
+        if rem == 6 { digits = "6" + digits; }
+        if rem == 7 { digits = "7" + digits; }
+        if rem == 8 { digits = "8" + digits; }
+        if rem == 9 { digits = "9" + digits; }
+        n = n / 10;
+    }
+    if is_neg {
+        digits = "-" + digits;
+    }
+    return digits;
+}
+
+pub fn parse_int(s: String) -> i64 {
+    let len = string_len(s);
+    if len == 0 { return 0; }
+    mut res: i64 = 0;
+    mut i: i64 = 0;
+    while i < len {
+        let c = string_char_at(s, i);
+        if c >= 48 && c <= 57 {
+            res = res * 10 + (c - 48);
+        }
+        i = i + 1;
+    }
+    return res;
+}
+
+pub fn parse_semver(v_str: String) -> SemVer {
+    let len = string_len(v_str);
+    mut dot1: i64 = -1;
+    mut dot2: i64 = -1;
+    mut i: i64 = 0;
+    while i < len {
+        let c = string_char_at(v_str, i);
+        if c == 46 { // '.'
+            if dot1 < 0 {
+                dot1 = i;
+            } else if dot2 < 0 {
+                dot2 = i;
+            }
+        }
+        i = i + 1;
+    }
+
+    if dot1 < 0 || dot2 < 0 {
+        return SemVer(major: 0, minor: 0, patch: 0);
+    }
+
+    let major_str = string_substr(v_str, 0, dot1);
+    let minor_str = string_substr(v_str, dot1 + 1, dot2 - dot1 - 1);
+    let patch_str = string_substr(v_str, dot2 + 1, len - dot2 - 1);
+
+    return SemVer(
+        major: parse_int(major_str),
+        minor: parse_int(minor_str),
+        patch: parse_int(patch_str)
+    );
+}
+
+pub fn format_semver(v: SemVer) -> String {
+    return int_to_str(v.major) + "." + int_to_str(v.minor) + "." + int_to_str(v.patch);
+}
+
+pub fn semver_compare(a: SemVer, b: SemVer) -> i64 {
+    if a.major != b.major {
+        return if a.major > b.major { 1 } else { -1 };
+    }
+    if a.minor != b.minor {
+        return if a.minor > b.minor { 1 } else { -1 };
+    }
+    if a.patch != b.patch {
+        return if a.patch > b.patch { 1 } else { -1 };
+    }
+    return 0;
+}
+
+pub fn semver_is_compatible(required: SemVer, actual: SemVer) -> bool {
+    // Caret requirement (^major.minor.patch): compatible if same major (or 0.minor for 0.x)
+    if required.major == 0 {
+        return actual.major == 0 && actual.minor == required.minor && actual.patch >= required.patch;
+    }
+    return actual.major == required.major && semver_compare(actual, required) >= 0;
+}
+
+pub fn generate_lockfile_entry(name: String, version: String, blake3_hash: String) -> String {
+    return "[[package]]\nname = \"" + name + "\"\nversion = \"" + version + "\"\nchecksum = \"" + blake3_hash + "\"\n\n";
+}
+
+pub fn test_kori_semver_resolver() -> bool {
+    let v1_0_0 = SemVer(major: 1, minor: 0, patch: 0);
+    let v1_1_0 = SemVer(major: 1, minor: 1, patch: 0);
+    let v1_2_3 = SemVer(major: 1, minor: 2, patch: 3);
+    let v2_0_0 = SemVer(major: 2, minor: 0, patch: 0);
+
+    if semver_compare(v1_0_0, v1_1_0) >= 0 { return false; }
+    if semver_compare(v1_2_3, v1_1_0) <= 0 { return false; }
+    if semver_compare(v1_2_3, v1_2_3) != 0 { return false; }
+
+    if !semver_is_compatible(v1_0_0, v1_2_3) { return false; }
+    if semver_is_compatible(v1_0_0, v2_0_0) { return false; }
+
+    let v0_1_0 = SemVer(major: 0, minor: 1, patch: 0);
+    let v0_1_2 = SemVer(major: 0, minor: 1, patch: 2);
+    let v0_2_0 = SemVer(major: 0, minor: 2, patch: 0);
+
+    if !semver_is_compatible(v0_1_0, v0_1_2) { return false; }
+    if semver_is_compatible(v0_1_0, v0_2_0) { return false; }
+
+    // Test format_semver
+    if format_semver(v1_2_3) != "1.2.3" {
+        return false;
+    }
+
+    // Test lockfile entry generation
+    let entry = generate_lockfile_entry("std", "0.1.0", "af1349b9f5f9");
+    if string_len(entry) <= 0 {
+        return false;
+    }
+
+    return true;
+}

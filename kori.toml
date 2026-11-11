@@ -1,0 +1,24 @@
+[package]
+name = "kori"
+version = "0.1.0"
+edition = "2026"
+authors = ["ASSOGBA Prudence Dieudonné <jprud67@gmail.com>"]
+license = "MIT OR Apache-2.0"
+description = "Autonomous Package Manager, Dependency Resolver, and Build Orchestrator for the IFA Systems Language"
+repository = "https://github.com/ifa-lang/kori"
+keywords = ["ifa", "package-manager", "build-system", "compiler", "semver"]
+
+[targets]
+bin = [
+    { name = "kori", path = "src/main.ifa" },
+    { name = "test_kori_package", path = "tests/test_kori_package.ifa" }
+]
+lib = { name = "kori", path = "src/lib.ifa", crate_types = ["ifalib"] }
+
+[profiles.dev]
+opt-level = 0
+debug = true
+
+[profiles.release]
+opt-level = 3
+lto = "fat"

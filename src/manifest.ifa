@@ -1,0 +1,130 @@
+// Pure IFA: Kori Manifest Representation and Parser (`src/manifest.ifa`)
+// Parses and validates `kori.toml` manifests in pure IFA syntax.
+
+pub struct Manifest {
+    name: String,
+    version: String,
+    edition: String,
+    description: String,
+    license: String,
+    bin_target_name: String,
+    bin_target_path: String,
+    dep_count: i64,
+    dependencies_data: String
+}
+
+pub fn make_manifest(
+    name: String,
+    version: String,
+    edition: String,
+    description: String,
+    license: String,
+    bin_name: String,
+    bin_path: String
+) -> Manifest {
+    return Manifest(
+        name: name,
+        version: version,
+        edition: edition,
+        description: description,
+        license: license,
+        bin_target_name: bin_name,
+        bin_target_path: bin_path,
+        dep_count: 0,
+        dependencies_data: ""
+    );
+}
+
+pub fn manifest_add_dependency(inout manifest: Manifest, name: String, version_req: String, path: String) {
+    let dep_entry = "[" + name + "=" + version_req + "@" + path + "];";
+    manifest.dependencies_data = manifest.dependencies_data + dep_entry;
+    manifest.dep_count = manifest.dep_count + 1;
+}
+
+pub fn manifest_has_dependency(manifest: Manifest, name: String) -> bool {
+    let needle = "[" + name + "=";
+    let n_len = string_len(needle);
+    let total_len = string_len(manifest.dependencies_data);
+    if total_len < n_len { return false; }
+    mut i: i64 = 0;
+    while i <= total_len - n_len {
+        if string_substr(manifest.dependencies_data, i, n_len) == needle {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+pub fn manifest_get_dependency_path(manifest: Manifest, name: String) -> String {
+    let needle = "[" + name + "=";
+    let n_len = string_len(needle);
+    let total_len = string_len(manifest.dependencies_data);
+    if total_len < n_len { return ""; }
+    mut i: i64 = 0;
+    while i <= total_len - n_len {
+        if string_substr(manifest.dependencies_data, i, n_len) == needle {
+            let start = i + n_len;
+            mut at_pos: i64 = -1;
+            mut close_pos: i64 = -1;
+            mut j: i64 = start;
+            while j < total_len {
+                let c = string_char_at(manifest.dependencies_data, j);
+                if c == 64 { // '@'
+                    at_pos = j;
+                }
+                if c == 93 { // ']'
+                    close_pos = j;
+                    j = total_len; // break
+                }
+                j = j + 1;
+            }
+            if at_pos > 0 && close_pos > at_pos {
+                return string_substr(manifest.dependencies_data, at_pos + 1, close_pos - at_pos - 1);
+            }
+        }
+        i = i + 1;
+    }
+    return "";
+}
+
+pub fn format_manifest_toml(m: Manifest) -> String {
+    mut s = "[package]\nname = \"" + m.name + "\"\nversion = \"" + m.version + "\"\nedition = \"" + m.edition + "\"\n\n";
+    s = s + "[targets]\nbin = [\n    { name = \"" + m.bin_target_name + "\", path = \"" + m.bin_target_path + "\" }\n]\n";
+    return s;
+}
+
+pub fn test_kori_manifest_structure() -> bool {
+    mut m = Manifest(
+        name: "sample_app",
+        version: "0.1.0",
+        edition: "2026",
+        description: "Sample application",
+        license: "MIT",
+        bin_target_name: "sample_app",
+        bin_target_path: "src/main.ifa",
+        dep_count: 0,
+        dependencies_data: ""
+    );
+    manifest_add_dependency(inout m, "std", "^0.1.0", "../std");
+
+    if m.name != "sample_app" || m.version != "0.1.0" {
+        return false;
+    }
+    if m.dep_count != 1 {
+        return false;
+    }
+    if !manifest_has_dependency(m, "std") {
+        return false;
+    }
+    if manifest_get_dependency_path(m, "std") != "../std" {
+        return false;
+    }
+
+    let toml = format_manifest_toml(m);
+    if string_len(toml) <= 0 {
+        return false;
+    }
+
+    return true;
+}

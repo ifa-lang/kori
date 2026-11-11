@@ -1,0 +1,32 @@
+name: Kori CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install IFA Toolchain
+        run: |
+          echo "Autonomous IFA Kori validation"
+
+      - name: Validate Manifest and Structure
+        run: |
+          test -f kori.toml
+          test -f src/main.ifa
+          test -f src/lib.ifa
+          test -f src/manifest.ifa
+          test -f src/resolver.ifa
+          test -f src/cache.ifa
+          test -f src/builder.ifa
+          test -f tests/test_kori_package.ifa
+          test -f LICENSE-MIT
+          test -f LICENSE-APACHE

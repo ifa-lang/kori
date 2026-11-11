@@ -1,0 +1,64 @@
+// Pure IFA: Kori Build Orchestrator (`src/builder.ifa`)
+// Orchestrates deterministic compilation for executable binaries, libraries, and tests.
+
+pub struct BuildConfig {
+    package_name: String,
+    opt_level: i64,
+    out_dir: String,
+    target_count: i64,
+    targets_data: String
+}
+
+pub fn make_build_config(package_name: String, opt_level: i64, out_dir: String) -> BuildConfig {
+    return BuildConfig(
+        package_name: package_name,
+        opt_level: opt_level,
+        out_dir: out_dir,
+        target_count: 0,
+        targets_data: ""
+    );
+}
+
+pub fn config_add_target(inout config: BuildConfig, name: String, path: String, kind: String) {
+    let entry = "[" + name + ":" + kind + ":" + path + "];";
+    config.targets_data = config.targets_data + entry;
+    config.target_count = config.target_count + 1;
+}
+
+pub fn build_target_output_name(config: BuildConfig, name: String, kind: String) -> String {
+    if kind == "bin" {
+        return config.out_dir + "/" + name;
+    }
+    if kind == "lib" {
+        return config.out_dir + "/lib" + name + ".ifalib";
+    }
+    return config.out_dir + "/" + name + "_test";
+}
+
+pub fn test_kori_builder_orchestrator() -> bool {
+    mut cfg = BuildConfig(
+        package_name: "kori",
+        opt_level: 3,
+        out_dir: "target/release",
+        target_count: 0,
+        targets_data: ""
+    );
+    config_add_target(inout cfg, "kori", "src/main.ifa", "bin");
+    config_add_target(inout cfg, "kori", "src/lib.ifa", "lib");
+
+    if cfg.target_count != 2 {
+        return false;
+    }
+
+    let bin_out = build_target_output_name(cfg, "kori", "bin");
+    let lib_out = build_target_output_name(cfg, "kori", "lib");
+
+    if bin_out != "target/release/kori" {
+        return false;
+    }
+    if lib_out != "target/release/libkori.ifalib" {
+        return false;
+    }
+
+    return true;
+}

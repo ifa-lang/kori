@@ -1,0 +1,53 @@
+// Pure IFA: Integration Test for Kori Package Manager (`tests/test_kori_package.ifa`)
+
+import manifest;
+import resolver;
+import cache;
+import builder;
+
+pub fn test_kori_package_end_to_end() -> bool {
+    // 1. Validate manifest definition
+    mut m = manifest::Manifest(
+        name: "app",
+        version: "1.0.0",
+        edition: "2026",
+        description: "Test App",
+        license: "MIT",
+        bin_target_name: "app",
+        bin_target_path: "src/main.ifa",
+        dep_count: 0,
+        dependencies_data: ""
+    );
+    manifest::manifest_add_dependency(inout m, "std", "^0.1.0", "../std");
+
+    // 2. Validate SemVer compatibility
+    let req_ver = resolver::SemVer(major: 0, minor: 1, patch: 0);
+    let act_ver = resolver::SemVer(major: 0, minor: 1, patch: 4);
+    let semver_ok = resolver::semver_is_compatible(req_ver, act_ver);
+
+    // 3. Validate cache storage
+    mut c = cache::make_build_cache();
+    cache::cache_put(inout c, "bin:app", "c0ffee1234", "target/dev/app");
+    let cached = cache::cache_get(c, "bin:app");
+
+    // 4. Validate builder target calculation
+    mut b = builder::BuildConfig(
+        package_name: "app",
+        opt_level: 2,
+        out_dir: "target/dev",
+        target_count: 0,
+        targets_data: ""
+    );
+    builder::config_add_target(inout b, "app", "src/main.ifa", "bin");
+    let out = builder::build_target_output_name(b, "app", "bin");
+
+    return semver_ok && cached == "target/dev/app" && out == "target/dev/app";
+}
+
+pub fn main() {
+    if test_kori_package_end_to_end() {
+        println("test_kori_package_end_to_end: ok");
+    } else {
+        println("test_kori_package_end_to_end: failed");
+    }
+}
