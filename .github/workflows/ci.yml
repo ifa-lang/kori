@@ -27,6 +27,8 @@ jobs:
           test -f src/resolver.ifa
           test -f src/cache.ifa
           test -f src/builder.ifa
+          test -f src/crypto.ifa
+          test -f src/workspace.ifa
           test -f tests/test_kori_package.ifa
           test -f LICENSE-MIT
           test -f LICENSE-APACHE

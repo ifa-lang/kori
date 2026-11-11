@@ -4,6 +4,8 @@ import manifest;
 import resolver;
 import cache;
 import builder;
+import crypto;
+import workspace;
 
 pub fn test_kori_package_end_to_end() -> bool {
     // 1. Validate manifest definition
@@ -41,7 +43,13 @@ pub fn test_kori_package_end_to_end() -> bool {
     builder::config_add_target(inout b, "app", "src/main.ifa", "bin");
     let out = builder::build_target_output_name(b, "app", "bin");
 
-    return semver_ok && cached == "target/dev/app" && out == "target/dev/app";
+    // 5. Validate cryptographic integrity and signature checking
+    let crypto_ok = crypto::test_kori_crypto_signatures();
+
+    // 6. Validate workspace multi-package graph and build ordering
+    let workspace_ok = workspace::test_kori_workspace_graph();
+
+    return semver_ok && cached == "target/dev/app" && out == "target/dev/app" && crypto_ok && workspace_ok;
 }
 
 pub fn main() {

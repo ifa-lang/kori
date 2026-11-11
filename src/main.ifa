@@ -4,9 +4,11 @@ import manifest;
 import resolver;
 import cache;
 import builder;
+import crypto;
+import workspace;
 
 pub fn main() {
-    println("kori: autonomous package manager for ifa (v0.1.0)");
+    println("kori: autonomous package manager for ifa (v0.2.0)");
 
     let t_manifest = manifest::test_kori_manifest_structure();
     if t_manifest {
@@ -36,7 +38,21 @@ pub fn main() {
         println("builder: failed");
     }
 
-    if t_manifest && t_resolver && t_cache && t_builder {
+    let t_crypto = crypto::test_kori_crypto_signatures();
+    if t_crypto {
+        println("crypto: ok");
+    } else {
+        println("crypto: failed");
+    }
+
+    let t_workspace = workspace::test_kori_workspace_graph();
+    if t_workspace {
+        println("workspace: ok");
+    } else {
+        println("workspace: failed");
+    }
+
+    if t_manifest && t_resolver && t_cache && t_builder && t_crypto && t_workspace {
         println("kori: ALL SUBSYSTEM TESTS PASSED");
     } else {
         println("kori: TESTS FAILED");

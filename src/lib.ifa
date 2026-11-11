@@ -4,14 +4,18 @@ import manifest;
 import resolver;
 import cache;
 import builder;
+import crypto;
+import workspace;
 
 pub fn kori_version() -> String {
-    return "0.1.0";
+    return "0.2.0";
 }
 
 pub fn test_kori_all() -> bool {
     return manifest::test_kori_manifest_structure()
         && resolver::test_kori_semver_resolver()
         && cache::test_kori_cache_subsystem()
-        && builder::test_kori_builder_orchestrator();
+        && builder::test_kori_builder_orchestrator()
+        && crypto::test_kori_crypto_signatures()
+        && workspace::test_kori_workspace_graph();
 }

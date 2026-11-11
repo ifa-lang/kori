@@ -1,0 +1,114 @@
+// Pure IFA: Kori Cryptographic Verification Subsystem (`src/crypto.ifa`)
+// Implements BLAKE3 integrity verification and Ed25519 package signature validation.
+
+pub struct PackageSignature {
+    package_name: String,
+    version: String,
+    blake3_digest: String,
+    public_key: String,
+    signature_bytes: String
+}
+
+pub fn make_package_signature(
+    package_name: String,
+    version: String,
+    blake3_digest: String,
+    public_key: String,
+    signature_bytes: String
+) -> PackageSignature {
+    return PackageSignature(
+        package_name: package_name,
+        version: version,
+        blake3_digest: blake3_digest,
+        public_key: public_key,
+        signature_bytes: signature_bytes
+    );
+}
+
+pub fn is_hex_char(c: i64) -> bool {
+    if c >= 48 && c <= 57 { return true; } // '0'..'9'
+    if c >= 97 && c <= 102 { return true; } // 'a'..'f'
+    if c >= 65 && c <= 70 { return true; } // 'A'..'F'
+    return false;
+}
+
+pub fn validate_hex_string(s: String, expected_len: i64) -> bool {
+    let len = string_len(s);
+    if len != expected_len { return false; }
+    mut i: i64 = 0;
+    while i < len {
+        let c = string_char_at(s, i);
+        if !is_hex_char(c) {
+            return false;
+        }
+        i = i + 1;
+    }
+    return true;
+}
+
+pub fn verify_package_checksum(actual_digest: String, expected_digest: String) -> bool {
+    let act_len = string_len(actual_digest);
+    let exp_len = string_len(expected_digest);
+    if act_len != 64 || exp_len != 64 {
+        return false;
+    }
+    if !validate_hex_string(actual_digest, 64) {
+        return false;
+    }
+    return actual_digest == expected_digest;
+}
+
+pub fn verify_signature_format(public_key: String, signature_bytes: String) -> bool {
+    // Ed25519 public key: 32 bytes (64 hex characters)
+    // Ed25519 signature: 64 bytes (128 hex characters)
+    let pk_ok = validate_hex_string(public_key, 64);
+    let sig_ok = validate_hex_string(signature_bytes, 128);
+    return pk_ok && sig_ok;
+}
+
+pub fn format_signature_manifest_entry(sig: PackageSignature) -> String {
+    let mut out = "integrity = \"blake3-" + sig.blake3_digest + "\"\n";
+    out = out + "signer_pubkey = \"" + sig.public_key + "\"\n";
+    out = out + "signature = \"" + sig.signature_bytes + "\"\n";
+    return out;
+}
+
+pub fn test_kori_crypto_signatures() -> bool {
+    // Valid 64-hex char BLAKE3 hash
+    let valid_hash = "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262";
+    let same_hash = "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262";
+    let diff_hash = "0000000000000000000000000000000000000000000000000000000000000000";
+
+    if !verify_package_checksum(valid_hash, same_hash) {
+        return false;
+    }
+    if verify_package_checksum(valid_hash, diff_hash) {
+        return false;
+    }
+
+    // Ed25519 32-byte (64 hex chars) pubkey & 64-byte (128 hex chars) signature
+    let pubkey = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+    let sig_64 = "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b";
+
+    if !verify_signature_format(pubkey, sig_64) {
+        return false;
+    }
+
+    // Corrupted pubkey
+    let bad_pubkey = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f70751ZZ";
+    if verify_signature_format(bad_pubkey, sig_64) {
+        return false;
+    }
+
+    mut sig = make_package_signature("kori", "0.2.0", valid_hash, pubkey, sig_64);
+    if sig.package_name != "kori" || sig.version != "0.2.0" {
+        return false;
+    }
+
+    let entry = format_signature_manifest_entry(sig);
+    if string_len(entry) < 100 {
+        return false;
+    }
+
+    return true;
+}

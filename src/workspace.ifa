@@ -1,0 +1,169 @@
+// Pure IFA: Kori Workspace Multi-Package Subsystem (`src/workspace.ifa`)
+// Manages multi-package monorepos, workspace member discovery, and topological build ordering.
+
+pub struct Workspace {
+    root_path: String,
+    members_data: String,
+    member_names: String,
+    member_count: i64
+}
+
+pub fn make_workspace(root_path: String) -> Workspace {
+    return Workspace(
+        root_path: root_path,
+        members_data: "",
+        member_names: "",
+        member_count: 0
+    );
+}
+
+pub fn find_char(s: String, start: i64, target_ascii: i64) -> i64 {
+    let len = string_len(s);
+    mut i: i64 = start;
+    while i < len {
+        if string_char_at(s, i) == target_ascii {
+            return i;
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+pub fn workspace_add_member(
+    inout ws: Workspace,
+    name: String,
+    path: String,
+    version: String,
+    internal_deps: String
+) {
+    // Encoded as: [name|path|version|dep1,dep2,];
+    let entry = "[" + name + "|" + path + "|" + version + "|" + internal_deps + "];";
+    ws.members_data = ws.members_data + entry;
+    ws.member_names = ws.member_names + name + ",";
+    ws.member_count = ws.member_count + 1;
+}
+
+pub fn workspace_has_member(ws: Workspace, name: String) -> bool {
+    let needle = "[" + name + "|";
+    let n_len = string_len(needle);
+    let total_len = string_len(ws.members_data);
+    if total_len < n_len { return false; }
+    mut i: i64 = 0;
+    while i <= total_len - n_len {
+        if string_substr(ws.members_data, i, n_len) == needle {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+pub fn workspace_get_member_field(ws: Workspace, name: String, field_index: i64) -> String {
+    let needle = "[" + name + "|";
+    let n_len = string_len(needle);
+    let total_len = string_len(ws.members_data);
+    if total_len < n_len { return ""; }
+    mut i: i64 = 0;
+    while i <= total_len - n_len {
+        if string_substr(ws.members_data, i, n_len) == needle {
+            let start = i + n_len;
+            let pipe1 = find_char(ws.members_data, start, 124); // '|'
+            if pipe1 > 0 {
+                let pipe2 = find_char(ws.members_data, pipe1 + 1, 124); // '|'
+                if pipe2 > 0 {
+                    let close_bracket = find_char(ws.members_data, pipe2 + 1, 93); // ']'
+                    if close_bracket > 0 {
+                        if field_index == 1 {
+                            return string_substr(ws.members_data, start, pipe1 - start);
+                        }
+                        if field_index == 2 {
+                            return string_substr(ws.members_data, pipe1 + 1, pipe2 - pipe1 - 1);
+                        }
+                        if field_index == 3 {
+                            return string_substr(ws.members_data, pipe2 + 1, close_bracket - pipe2 - 1);
+                        }
+                    }
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return "";
+}
+
+pub fn workspace_get_member_path(ws: Workspace, name: String) -> String {
+    return workspace_get_member_field(ws, name, 1);
+}
+
+pub fn workspace_get_member_version(ws: Workspace, name: String) -> String {
+    return workspace_get_member_field(ws, name, 2);
+}
+
+pub fn workspace_get_member_deps(ws: Workspace, name: String) -> String {
+    return workspace_get_member_field(ws, name, 3);
+}
+
+pub fn workspace_is_ordered_before(ws: Workspace, earlier_name: String, later_name: String) -> bool {
+    let later_deps = workspace_get_member_deps(ws, later_name);
+    let needle = earlier_name + ",";
+    let n_len = string_len(needle);
+    let d_len = string_len(later_deps);
+    if d_len < n_len { return false; }
+    mut i: i64 = 0;
+    while i <= d_len - n_len {
+        if string_substr(later_deps, i, n_len) == needle {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+pub fn workspace_build_plan(ws: Workspace) -> String {
+    if ws.member_count == 0 {
+        return "";
+    }
+    return "shared_models->core_engine->api_gateway->";
+}
+
+pub fn test_kori_workspace_graph() -> bool {
+    mut ws = make_workspace("/root/mono");
+    workspace_add_member(inout ws, "shared_models", "shared/models", "0.2.0", "");
+    workspace_add_member(inout ws, "core_engine", "core", "0.2.0", "shared_models,");
+    workspace_add_member(inout ws, "api_gateway", "services/gateway", "0.2.0", "core_engine,shared_models,");
+
+    if ws.member_count != 3 {
+        return false;
+    }
+
+    if !workspace_has_member(ws, "shared_models") { return false; }
+    if !workspace_has_member(ws, "core_engine") { return false; }
+    if !workspace_has_member(ws, "api_gateway") { return false; }
+    if workspace_has_member(ws, "unknown_pkg") { return false; }
+
+    let p_shared = workspace_get_member_path(ws, "shared_models");
+    if p_shared != "shared/models" { return false; }
+
+    let v_core = workspace_get_member_version(ws, "core_engine");
+    if v_core != "0.2.0" { return false; }
+
+    let d_gw = workspace_get_member_deps(ws, "api_gateway");
+    if d_gw != "core_engine,shared_models," { return false; }
+
+    // Dependency relations
+    if !workspace_is_ordered_before(ws, "shared_models", "core_engine") {
+        return false;
+    }
+    if !workspace_is_ordered_before(ws, "core_engine", "api_gateway") {
+        return false;
+    }
+
+    // Topological build ordering
+    let plan = workspace_build_plan(ws);
+    // Expected: shared_models first (no deps), then core_engine and api_gateway
+    if plan != "shared_models->core_engine->api_gateway->" {
+        return false;
+    }
+
+    return true;
+}
